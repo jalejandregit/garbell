@@ -1,0 +1,41 @@
+#garbell-results table.nested td { vertical-align: top; }
+#garbell-results table.fixed td { 
+  vertical-align: top; 
+  /*background-color: rgb(226, 222, 216);*/
+}
+
+.g-images-row { 
+  /*background: #f9f9f9; */
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;    
+ }
+.g-images-row td { padding: 5px; word-wrap: break-word; }
+.g-image-thumb { border: 1px solid #ccc; padding: 2px; }
+.g-image-thumb:hover { border-color: #999; }
+
+/* 
+garbell fixed thead>th taula principal
+garbell nested thead>th taula secundaria
+
+table.garbell.fixed, table.garbell.nested {
+    table-layout: fixed!important;
+    width: 250px!important;
+}
+    */
+.garbell.fixed thead th, .garbell.fixed tbody td {
+    border: 1px solid rgb(9, 126, 44)!important;
+}
+
+.garbell.nested thead th, .garbell.nested tbody td {
+    /*border: 1px solid rgb(220 231 217) !important;*/
+    border: 1px solid rgb(187 191 186) !important;
+}
+
+.garbell.fixed {
+  width: 100%;
+  table-layout: fixed; /* Ayuda a mantener un ancho fijo si es necesario */
+}
+.garbell.nested {
+  width: 100%;
+  table-layout: fixed; /* Ayuda a mantener un ancho fijo si es necesario */
+}
