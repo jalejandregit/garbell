@@ -168,13 +168,15 @@ function garbell_contributor_page() {
             <table class="garbell fixed">
                 <thead>
                     <tr>
-                        <th style="width: 33%;">URL Scraper</th>
-                        <th style="width: 33%;">Profunditat</th>
-                        <th style="width: 33%;">Nº pàgines a extreure</th>
+                        <th style="width: 10%;"></th>
+                        <th style="width: 50%;">URL Scraper</th>
+                        <th style="width: 20%;">Profunditat</th>
+                        <th style="width: 20%;">Nº pàgines a extreure</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
+                        <td><?php submit_button('Desar configuració'); ?></td>
                         <td><?php combobox_urls_ajax($saved_conf['startUrl']); ?></td>
                         <td><input type="number" id="maxDepth" name="maxDepth" value="<?php echo esc_attr($general_settings['maxDepth']); ?>"></td>
                         <td><input type="number" id="maxPages" name="maxPages" value="<?php echo esc_attr($general_settings['maxPages']); ?>"></td>
@@ -224,12 +226,12 @@ function garbell_contributor_page() {
                     </td>
                 </tr>
             </table>
+            <br>
+            
 
-            <?php submit_button('Desar configuració'); ?>
-
-            <div>
+            <div id="div-scraping"   style="display: flex; gap: 10px;">
                 <button id="garbell-run" class="button button-primary" type="button">
-                    Executar scraping pel garbell
+                    Scraping
                 </button>
                 <img id="myLoaderGif" src="http://localhost/triapedres/wp-content/uploads/2025/11/lBsSZ.gif" alt="GIF de carga AJAX">
             </div>
@@ -319,7 +321,19 @@ function garbell_ajax_import_selected() {
         wp_send_json_error($res->get_error_message(), 500);
     }
 
+    // Si $res es array('inserted_post_ids' => [...]) devolvemos sólo el array de ids
+    $ids = is_array($res) && isset($res['inserted_post_ids']) ? $res['inserted_post_ids'] : $res;
+
+    //error_log('AJAX import: ' . print_r($ids, true)); // sólo para debug en log
+    wp_send_json_success(array_values($ids)); // devuelve directamente la lista en resp.data
+
+    /*
+    $res = $importer->import_batch($payload);
+    if (is_wp_error($res)) {
+        wp_send_json_error($res->get_error_message(), 500);
+    }
     wp_send_json_success($res);
+    */
 }
 add_action('wp_ajax_garbell_import_selected', 'garbell_ajax_import_selected');
 

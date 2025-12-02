@@ -3,46 +3,58 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class garbell_Importer {
 
+    //private $inserted = array();
+
     public function __construct() {}
 
-public function import_batch($batch = array()) {
-    global $wpdb;
-    if (empty($batch) || !is_array($batch)) {
-        return new WP_Error('invalid_payload', 'Payload inválido');
-    }
 
-    global $wpdb;
-    $inserted = array();
+    public function import_batch($batch = array()) {
+        global $wpdb;
+        if (empty($batch) || !is_array($batch)) {
+            return new WP_Error('invalid_payload', 'Payload inválido');
+        }
 
-
-    $max_contador = $wpdb->get_var(
-        "SELECT MAX(CAST(meta_value AS UNSIGNED)) 
-        FROM {$wpdb->postmeta} 
-        WHERE meta_key = 'link_click_counter'"
-    );
-    //echo $max_contador;
+        global $wpdb;
+        $inserted = array();
 
 
+        $max_contador = $wpdb->get_var(
+            "SELECT MAX(CAST(meta_value AS UNSIGNED)) 
+            FROM {$wpdb->postmeta} 
+            WHERE meta_key = 'link_click_counter'"
+        );
+        //echo $max_contador;
 
 
 
-    foreach ($batch as $item) {
-
-        // Campos requeridos
-        $url        = $item['linkPost']       ?? '';
-        $title      = $item['linkTitlePost']  ?? '';
-        $images     = $item['linksImg']       ?? array();
-        $thumbs     = $item['linksImgThumb']  ?? array();
-        $lat        = $item['lat']            ?? '';
-        $lon        = $item['lon']            ?? '';
-        $autor      = $item['autor']          ?? '';
-        $autorUrl   = $item['autorUrl']       ?? '';
-        $orientacio = $item['orientacio']     ?? '';
-        $location   = $item['location']       ?? '';
 
 
-        //if (defined('WP_DEBUG') && WP_DEBUG) {
+        foreach ($batch as $item) {
+
+            // Campos requeridos
+            $url        = $item['linkPost']       ?? '';
+            $title      = $item['linkTitlePost']  ?? '';
+            $images     = $item['linksImg']       ?? array();
+            $thumbs     = $item['linksImgThumb']  ?? array();
+            $lat        = $item['lat']            ?? '';
+            $lon        = $item['lon']            ?? '';
+            $autor      = $item['autor']          ?? '';
+            $autorUrl   = $item['autorUrl']       ?? '';
+            $orientacio = $item['orientacio']     ?? '';
+            $location   = $item['location']       ?? '';
+            $import     = $item['import_post']    ?? '';
+
+
+            //if (defined('WP_DEBUG') && WP_DEBUG) {
             $rows = count($images);  
+            //error_log($title.' -->Imagenes seleccionadas'. $rows );
+
+             if($import==="NO"){
+                 $post_id= $this->import_scraped($item);
+                 $inserted[] = $post_id;
+                    continue;
+                }
+
 
             for ($i = 0; $i < $rows; $i++) {
                 //error_log($title.' -->Imagen_'.$i.'='. $images[$i] );
@@ -63,14 +75,15 @@ public function import_batch($batch = array()) {
                 // ---------------------------------------------
                 // INSERTAR POST
                 // ---------------------------------------------
-                
+                $status ='publish';
+               
                 $post_arr = array(
                     'post_author'       => get_current_user_id() ?: 1,  // evitar pending
                     'post_date'         => current_time('mysql'),
                     'post_date_gmt'     => current_time('mysql', 1),
                     'post_title'        => $title,
                     'post_excerpt'      => '',
-                    'post_status'       => 'publish',
+                    'post_status'       => $status,
                     'comment_status'    => 'closed',
                     'ping_status'       => 'closed',
                     'post_name'         => sanitize_title($title),
@@ -80,8 +93,8 @@ public function import_batch($batch = array()) {
                 );
 
                 $post_id = wp_insert_post($post_arr, true);
-
-                if (is_wp_error($post_id)) {
+               
+                if (is_wp_error($post_id) || $import==='NO') {
                     continue;
                 }
 
@@ -95,6 +108,8 @@ public function import_batch($batch = array()) {
 
                 add_post_meta($post_id, 'link_post', $url);
                 add_post_meta($post_id, '_link_post', 'field_630485e99c971');
+
+                /**** Si post=scraped saltar Imatges + Geo + Excerpt ****/
 
                 $image_for_meta = !empty($images) ? $images[$i] : '';
                 add_post_meta($post_id, 'urlImagen', $image_for_meta);
@@ -124,17 +139,22 @@ public function import_batch($batch = array()) {
                 // ---------------------- CATEGORÍAS GEO ---------------------- //
                 $state   = $geo['state']   ?? '';
                 $county  = $geo['county']  ?? '';
-                $village = $geo['village'] ?? '';
+                $city = $geo['city'] ?? '';
 
-                $cat_state_id   = $this->ensure_category($state, 0);
-                $cat_county_id  = $this->ensure_category($county, $cat_state_id);
-                $cat_village_id = $this->ensure_category($village, $cat_county_id);
+                $state_1 = explode('/', $state)[0];
+                $county_1 = explode('/', $county)[0];
+                $city_1 = explode('/', $city)[0];
+
+                $cat_top = $this->ensure_category("Roca", 0);
+                $cat_state_id   = $this->ensure_category($state_1, $cat_top);
+                $cat_county_id  = $this->ensure_category($county_1, $cat_state_id);
+                $cat_village_id = $this->ensure_category($city_1, $cat_county_id);
 
                 $categories = array_filter([$cat_state_id, $cat_county_id, $cat_village_id]);
                 if (!empty($categories)) {
                     wp_set_post_terms($post_id, $categories, 'category', true);
                 }
-
+                
                 // ---------------------------------------------------------
                 //   AÑADIR TÉRMINO "orientacio" → wp_term_relationships
                 // ---------------------------------------------------------
@@ -166,18 +186,64 @@ public function import_batch($batch = array()) {
 
                 // ---------------------- EXCERPT + PUBLICACIÓN ---------------------- //
                 $this->topo_Custom_Excerpt($post_id);
-
                 $inserted[] = $post_id;
             }
-            
-        //} //END if (defined('WP_DEBUG') && WP_DEBUG)
+        }
 
-        
+        foreach ($inserted as $val) {   error_log("Insertado: ".$val);  }
+
+        return array('inserted_post_ids' => $inserted);
     }
 
-    return array('inserted_post_ids' => $inserted);
-}
+    private function import_scraped($item){
+                // Campos requeridos
+        $url        = $item['linkPost']       ?? '';
+        $title      = $item['linkTitlePost']  ?? '';
+        $images     = $item['linksImg']       ?? array();
+        $thumbs     = $item['linksImgThumb']  ?? array();
+        $lat        = $item['lat']            ?? '';
+        $lon        = $item['lon']            ?? '';
+        $autor      = $item['autor']          ?? '';
+        $autorUrl   = $item['autorUrl']       ?? '';
+        $orientacio = $item['orientacio']     ?? '';
+        $location   = $item['location']       ?? '';
+        $import     = $item['import_post']    ?? '';
 
+        error_log("Save: --> ". $title. " a scraper");
+
+
+        $dominio  = parse_url($url, PHP_URL_HOST);
+        $esquema  = parse_url($url, PHP_URL_SCHEME);
+        $dominio_limpio = $esquema . "://" . $dominio . "\n";
+
+        // ---------------------------------------------
+        // INSERTAR POST
+        // ---------------------------------------------   
+        //$status='scraped';   
+         $status='pending';
+        $post_arr = array(
+                    'post_author'       => get_current_user_id() ?: 1,  // evitar pending
+                    'post_date'         => current_time('mysql'),
+                    'post_date_gmt'     => current_time('mysql', 1),
+                    'post_title'        => $title,
+                    'post_excerpt'      => '',
+                    'post_status'       => $status,
+                    'comment_status'    => 'closed',
+                    'ping_status'       => 'closed',
+                    'post_name'         => sanitize_title($title),
+                    'pinged'            => $url,
+                    'guid'              => $dominio_limpio,
+                    'post_type'         => 'post',
+                );
+
+        $post_id = wp_insert_post($post_arr, true);
+
+         // ---------------------- METADATOS ---------------------- //
+        add_post_meta($post_id, 'link_post', $url);
+        add_post_meta($post_id, '_link_post', 'field_630485e99c971');
+
+        return $post_id;
+    }
 
     private function ensure_category($name, $parent_id = 0) {
         if (empty($name)) return 0;
@@ -189,9 +255,47 @@ public function import_batch($batch = array()) {
 
     private function reverse_geocode($lat, $lon) {
         $url = esc_url_raw(
-            "https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=ca&lat="
-            . rawurlencode($lat) . "&lon=" . rawurlencode($lon)
+            "https://nominatim.openstreetmap.org/reverse?format=geojson&lat="
+            . rawurlencode($lat)
+            . "&lon=" . rawurlencode($lon)
+            . "&accept-language=ca"
+            //. "&layer=address"
         );
+
+        $resp = wp_remote_get($url, [
+            'headers' => ['User-Agent' => 'garbellPlugin/1.0'],
+            'timeout' => 10
+        ]);
+
+        if (is_wp_error($resp)) return [];
+
+        $json = json_decode(wp_remote_retrieve_body($resp), true);
+        $properties = $json['features'][0]['properties'] ?? [];
+        $address = $properties['address'] ?? [];
+
+        // Alias por nivel
+        $CITY_FIELDS   = ['city', 'town', 'village', 'hamlet', 'municipality'];
+        $STATE_FIELDS  = ['state', 'province', 'region', 'state_district'];
+        $COUNTY_FIELDS = ['county', 'district', 'municipality', 'borough', 'city_district'];
+
+        return [
+            'location' => $properties['display_name'] ?? '',
+            'state'    => $this->get_first_available($address, $STATE_FIELDS),
+            'county'   => $this->get_first_available($address, $COUNTY_FIELDS),
+            'city'     => $this->get_first_available($address, $CITY_FIELDS)
+        ];
+    }
+
+    private function get_first_available($array, $keys) {
+        foreach ($keys as $k) {
+            if (!empty($array[$k])) return $array[$k];
+        }
+        return '';
+    }
+
+    /*
+    private function reverse_geocode_OLD($lat, $lon) {
+        $url = esc_url_raw("https://nominatim.openstreetmap.org/reverse?format=geojson&lat=". rawurlencode($lat) . "&lon=" . rawurlencode($lon)."&layer=address");
 
         $resp = wp_remote_get($url, [
             'headers' => ['User-Agent' => 'garbellPlugin/1.0'],
@@ -203,14 +307,24 @@ public function import_batch($batch = array()) {
         $body = wp_remote_retrieve_body($resp);
         $json = json_decode($body, true);
 
+
+        $properties = $json['features'][0]['properties'] ?? [];
+        $address    = $properties['address'] ?? [];
         return [
-            'location' => $json['display_name']         ?? '',
-            'state'    => $json['address']['state']     ?? '',
-            'county'   => $json['address']['county']    ?? '',
-            'village'  => $json['address']['village']   ?? ''
+            'location' => $properties['display_name'] ?? '',
+            'state'    => $address['country']
+                        ?? $address['state'] 
+                        ?? '',
+            'county'   => $address['county']
+                        ?? $address['state'] 
+                        ?? '',
+            'city'     => $address['city'] 
+                        ?? $address['town'] 
+                        ?? $address['village'] 
+                        ?? '',
         ];
     }
-
+    */
     // ----------------------------------------------------------
     //               EXCERPT + PUBLICACIÓN
     // ----------------------------------------------------------
@@ -240,7 +354,7 @@ public function import_batch($batch = array()) {
         $post_excerpt = '<strong>'.$post_link_title.'</strong>'.$taula_dades.'<div class="thumb"><a class="count" id="countable_link_'.$post_id.'-2"  href="'.$href.'" target="_blank"><img src="'.$thumb.'" ></a></div>';
 
         add_post_meta($post_id, 'orientacio', $post_orient);
-
+       
         wp_update_post([
             'ID'           => $post_id,
             'post_excerpt' => $post_excerpt,

@@ -10,10 +10,21 @@ jQuery(document).ready(function($){
     });
 
 
+
+    $("#garbell-run").on('click', function(){
+        $("#myLoaderGif").show();
+    });
+
+
+    //$.get("garbell-contributor", function(data){
+    ///        $("#myLoaderGif").hide();
+     //   });
+
+
     $('#garbell-run').on('click', function(e){
         e.preventDefault();
         
-        $("#myLoaderGif").toggle();
+        
         var data = {
             action: 'garbell_run_scrape',
             nonce: garbell_ajax.nonce,
@@ -32,7 +43,6 @@ jQuery(document).ready(function($){
                 return;
             }
             renderResults(resp.data);
-            $("#garbell-run").toggle();
         });
     });
 
@@ -46,30 +56,23 @@ jQuery(document).ready(function($){
         }
 
         html += '<form id="garbell-import-form">';
-        html += '<div id="div-garbell-import" style="display: flex;">';
-        html += '<p><button id="garbell-import" type="button" class="button button-primary" style="margin: 5px;">Importar</button>';
-        html += '<button id="garbell-import-cancel" type="button" class="button button-secondary" style="margin: 5px;">Cancelar</button>';
-        html += '<img id="myLoaderGifImport" style="display: none;" src="http://localhost/triapedres/wp-content/uploads/2025/11/lBsSZ.gif" alt="GIF de carga AJAX"></p></div>';
         html += '<table class="garbell fixed" id="garbell-table"><thead><tr>';
-        html += '<th style="width: 10%;">Selecció</th>';
-        html += '<th style="width: 30%;">TitlePost</th>';
+        html += '<th style="width: 4%;">Selecció</th>';
+        html += '<th style="width: 42%;">TitlePost</th>';
         html += '<th style="width: 20%;">LinkPost</th>';
-        html += '<th style="width: 5%;">Orientació</th>';
+        html += '<th style="width: 4%;">Orientació</th>';
         html += '<th style="width: 20%;">Coordenades</th>';
         html += '<th style="width: 10%;">Autor</th>';
         html += '</tr></thead><tbody>';
         data.postsData.forEach(function(post, idx){
             var id = 'p_' + idx;
             html += '<tr data-idx="'+idx+'">';
-            html += '<td style="width: 10%;">';
-            html += '<label><input type="radio" name="import_'+idx+'" value="SI">SI  </label>';
-            html += '<label><input type="radio" name="import_'+idx+'" value="NO" checked>NO  </label>';
-            html += '</td>';
-
-            html += '<td style="width: 30%;">'+escapeHtml(post.linkTitlePost || '')+'</td>';
+            html += '<td style="width: 4%;"><input type="checkbox" class="g-select" data-idx="'+idx+'"></td>';
+            html += '<td style="width: 32%;">'+escapeHtml(post.linkTitlePost || '')+'</td>';
             html += '<td style="width: 20%;"><a href="'+post.linkPost+'" target="_blank">'+post.linkPost+'</a></td>';
-            html += '<td style="width: 5%;"><select class="g-orient"><option>N</option><option>NE</option><option>E</option><option>SE</option><option selected="selected">S</option><option>SW</option><option>W</option><option>NW</option></select></td>';
+            html += '<td style="width: 4%;"><select class="g-orient"><option value="">-</option><option>N</option><option>NE</option><option>E</option><option>SE</option><option>S</option><option>SW</option><option>W</option><option>NW</option></select></td>';
             html += '<td style="width: 20%;"><input type="text" class="g-coordenadas" style="width:300px;"></td>';
+            //html += '<td style="width: 10%;">'+escapeHtml(post.linkAutor || '')+'</td>';
             html += '<td style="width: 10%;"><a href="'+post.linkAutorUrl+'" target="_blank">'+post.linkAutor+'</a></td>';
             html += '</tr>';
 
@@ -93,37 +96,32 @@ jQuery(document).ready(function($){
             html += '</td></tr>';
         });
         html += '</tbody></table>';
-        //html += '<div>';
-        //html += '<p><button id="garbell-import" type="button" class="button button-primary">Importar</button></p>';
-        //html += '<img id="myLoaderGifImport" style="display: none;" src="http://localhost/triapedres/wp-content/uploads/2025/11/lBsSZ.gif" alt="GIF de carga AJAX"></div>';
+        html += '<div>';
+        html += '<p><button id="garbell-import" type="button" class="button button-primary">Importar seleccionats</button></p>';
+        html += '<img id="myLoaderGifImport" style="display: none;" src="http://localhost/triapedres/wp-content/uploads/2025/11/lBsSZ.gif" alt="GIF de carga AJAX"></div>';
         html += '</form>';
         $('#garbell-results').html(html);
-
-        $('#garbell-import-cancel').on('click', function(){
-            $("#myLoaderGifImport").toggle();
-            $("#garbell-import-form").toggle();
-            $("#garbell-run").toggle();
-        });
-    
+        //$("myLoaderGifImport").hide();
         $('#garbell-import').on('click', function(){
-            $("#garbell-import-cancel").toggle();
+
+            //$("#myLoaderGifImport").show();//mostrem el gif de carga en començar la importació
             $("#myLoaderGifImport").toggle();
 
             // build payload
             var payload = [];
-            var alertas='';
-
             $('#garbell-table tbody tr').each(function(){
                 var tr = $(this);
                 var idx = tr.data('idx');
                 if (typeof idx === 'undefined') return;
-                var import_post = $('input[name="import_'+idx+'"]:checked').val();
+                var checked = tr.find('.g-select').is(':checked');
+                if (!checked) return;
                 var post = data.postsData[idx];
                 var lat = ''; //tr.find('.g-lat').val();
                 var lon = ''; //tr.find('.g-lon').val();
                 var coords = tr.find('.g-coordenadas').val();
-                if (coords.trim().length === 0 && import_post==='SI') {
-                    alertas += post.linkTitlePost +  " --> Introduir Coordenades\n";
+                if (coords.trim().length === 0) {
+                    alert("El camp Coordenades és buit, completar abans d'importar.");
+                return false;
                 }
 
                 if (coords) {
@@ -137,11 +135,7 @@ jQuery(document).ready(function($){
 
 
                 var orient = tr.find('.g-orient').val();
-                 if(!orient && import_post==='SI'){
-                    alertas += post.linkTitlePost +  " --> Indicar Orientació\n";
-                    alert(alertas );
-                }
-
+                //alert("Orientació seleccionada: " + orient);
                 // collect selected images
                 var images = [];
                 var thumbs = [];
@@ -158,12 +152,6 @@ jQuery(document).ready(function($){
                     if (thumbVal) thumbs.push(thumbVal);
                 });
 
-                var rows = images.length; 
-                if(rows===0 && import_post==='SI'){
-                    alertas += post.linkTitlePost +  " --> Seleccionar mínim una imatge\n";
-                    alert(alertas );
-                }
-
                 payload.push({
                     linkPost: post.linkPost,
                     linkTitlePost: post.linkTitlePost,
@@ -175,17 +163,15 @@ jQuery(document).ready(function($){
                     autor: post.linkAutor,
                     autorUrl: post.linkAutorUrl,
                     orientacio: orient,
-                    location: '',
-                    import_post: import_post
+                    location: ''
                 });
             });
 
-            if(alertas !=''){
-                    alert(alertas );
-                    return false;
+            if (payload.length === 0) {
+                alert('No hay posts seleccionados para importar.');
+                return;
             }
 
-          
             var send = {
                 action: 'garbell_import_selected',
                 nonce: garbell_ajax.nonce,
@@ -196,11 +182,10 @@ jQuery(document).ready(function($){
                     alert('Error: ' + resp.data);
                     return;
                 }
-                alert('Importado. IDs: ' + JSON.stringify(resp.data));
                 $("#myLoaderGifImport").toggle();
-                $("#garbell-import-form").toggle();
-                $("#garbell-run").toggle();
+                alert('Importado. IDs: ' + JSON.stringify(resp.data.inserted_post_ids));
             });
+            //$("#myLoaderGifImport").hide();//ocultem el gif de carga en acabar la importació  
         });
 
         $("#myLoaderGif").hide();//ocultem el gif de carga en acabar l'scraping
