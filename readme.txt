@@ -27,6 +27,8 @@ garbell/
 
 #---- XPATH ----
 
+cambio en rama1
+
 ---- https://santillop.blogspot.com/
 pag --> //a[@id='Blog1_blog-pager-older-link']
 exc --> //p[not(.//a[@href])]
