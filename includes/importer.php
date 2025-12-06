@@ -293,38 +293,6 @@ class garbell_Importer {
         return '';
     }
 
-    /*
-    private function reverse_geocode_OLD($lat, $lon) {
-        $url = esc_url_raw("https://nominatim.openstreetmap.org/reverse?format=geojson&lat=". rawurlencode($lat) . "&lon=" . rawurlencode($lon)."&layer=address");
-
-        $resp = wp_remote_get($url, [
-            'headers' => ['User-Agent' => 'garbellPlugin/1.0'],
-            'timeout' => 10
-        ]);
-
-        if (is_wp_error($resp)) return [];
-
-        $body = wp_remote_retrieve_body($resp);
-        $json = json_decode($body, true);
-
-
-        $properties = $json['features'][0]['properties'] ?? [];
-        $address    = $properties['address'] ?? [];
-        return [
-            'location' => $properties['display_name'] ?? '',
-            'state'    => $address['country']
-                        ?? $address['state'] 
-                        ?? '',
-            'county'   => $address['county']
-                        ?? $address['state'] 
-                        ?? '',
-            'city'     => $address['city'] 
-                        ?? $address['town'] 
-                        ?? $address['village'] 
-                        ?? '',
-        ];
-    }
-    */
     // ----------------------------------------------------------
     //               EXCERPT + PUBLICACIÓN
     // ----------------------------------------------------------
@@ -338,20 +306,25 @@ class garbell_Importer {
         $post_orient= get_field('orientacio', $post_id);
         $post_lat   = get_field('latitud', $post_id);
         $post_lon   = get_field('longitud', $post_id);
-
+        $location   = get_field('location', $post_id);
+        /*
         $link_location = $this->getLinkopenMaps($post_lat,$post_lon)
                         . ' - '
                         . $this->getLinkopenOSMaps($post_lat,$post_lon);
-
-        $rosavents = $this->getDivOrientacio($post_orient);
+        */
+        $link_location = $this->openMaps($post_lat,$post_lon,$location); // ----> getLinkopenMaps($post_lat,$post_lon)             
+        $rosavents = $this->getOrientacio($post_orient);
 
         $href  = get_field('urlImagen', $post_id);
         $thumb = get_field('_thumbnail_id', $post_id);
 
         $post_link_title = '<p class="list-post-meta"><span class="published"><a class="count" id="countable_link_'.$post_id.'"  href="'.$post_link.'" target="_blank">'.$post_title.'</a></span></p>';
-        $taula_dades = $this->getTableDades($autor, $autorurl, $rosavents, $link_location);
-
-        $post_excerpt = '<strong>'.$post_link_title.'</strong>'.$taula_dades.'<div class="thumb"><a class="count" id="countable_link_'.$post_id.'-2"  href="'.$href.'" target="_blank"><img src="'.$thumb.'" ></a></div>';
+        
+        
+        //$taula_dades = $this->getTableDades($autor, $autorurl, $rosavents, $link_location);
+        $taula_dades= $this->getTableDades($post_id, $post_title, $post_link, $autor,$autorurl, $rosavents,$link_location);
+        $post_excerpt = $taula_dades.'<div class="thumb"><a class="count" id="countable_link_'.$post_id.'-2"  href="'.$href.'" target="_blank"><img src="'.$thumb.'" ></a></div>';
+        //$post_excerpt = '<strong>'.$post_link_title.'</strong>'.$taula_dades.'<div class="thumb"><a class="count" id="countable_link_'.$post_id.'-2"  href="'.$href.'" target="_blank"><img src="'.$thumb.'" ></a></div>';
 
         add_post_meta($post_id, 'orientacio', $post_orient);
        
@@ -363,14 +336,160 @@ class garbell_Importer {
         
     }
 
-    private function getTableDades($autor, $autorurl, $orientacio_html, $location_html) {
+    function openMaps($post_lat,$post_lon,$location){
+	
+        $location_split = getTitleLocation($location);
+        $location_map = mb_substr($location_split, 0, 22);
+        $ubicacio = strlen($location_map) > 21 ? $location_map.'...': $location_map;      
+        error_log( 'openMaps -> $title_curt: ' . $title_curt);       
+        return '<a href=https://www.google.com/maps/search/?api=1&query='.$post_lat.','.$post_lon.' target="_blank" title="'.$location_split.'">'.$ubicacio.'</a>';
+    }
+
+    function getTitleLocation($cadena){
+        //$datos = ["L-401", "Perles", "Fígols i Alinyà", "Alt Urgell", "Catalunya", "25794", "Espanya"];
+        error_log("getTitleLocation-> Location : " .$cadena, true);
+        $resultado='';
+    
+        // Convertir el string en array (eliminando espacios sobrantes)
+        $datos = array_map('trim', explode(',', $cadena));
+
+        // 1. Comprobar que no esté vacío
+        if (!empty($datos)) {
+
+            // 2. Comprobar que tiene más de dos elementos
+            if (count($datos) > 2) {
+
+                // 3. Extraer todos menos los dos últimos y concatenarlos en un string
+                $subset = array_slice($datos, 0, -2);
+                $resultado = implode(", ", $subset);
+            return $resultado;
+            }  
+        }
+    }
+    private function getTableDades($post_id, $post_title, $post_link, $autor, $autorurl ,$orientacio_html, $location_html){
+	
+        $title = mb_substr($post_title, 0, 31);
+        $title_curt = strlen($title) > 30 ? $title.'...': $title;
+        
+        $post_link_title = '<p class="list-post-meta"><span class="published"><a class="count" id="countable_link_'.$post_id.'"  href="'.$post_link.'" target="_blank" title="'.$post_title.'">"'.$title_curt.'</a></span></p>';
+        
+        $nom = mb_substr($autor, 0, 22);
+        $nom_curt = strlen($nom) > 21 ? $nom.'...': $nom;
+
+        $html  = '<div class="container">';
+        $html  .= '<div class="ico-1"><i class="fa-sharp fa-solid fa-dove"></i></div>';
+        $html  .= '<div class="text-1">'.$post_link_title.'</div>';
+        $html  .= '<div class="ico-2"><i class="fas fa-user-pen"></i></div>';
+        $html  .= '<div class="text-2"><a href="'.$autorurl.'" target="_blank" title="'.$autor.'" >'.$nom_curt.'</a></div>';
+        $html  .= '<div class="ico-3"><i class="fas fa-location-dot"></i></div>';
+        $html  .= '<div class="text-3">'.$location_html.'</div>';
+        $html  .= '<div class="rosa">'.$orientacio_html.'</div>';
+        $html  .= '</div>';
+
+        return $html;
+    }
+
+    private function getTableDades_OLD($autor, $autorurl, $orientacio_html, $location_html) {
         $table1 = '<table style="width:100%" class="table_dades"><tbody><tr><td style="width:5%"><i class="fas fa-user-pen"></i></td><td><a href="'.$autorurl.'" target="_blank">'.$autor.'</a></td><td style="width:15%" rowspan="2">'.$orientacio_html.'</td></tr><tr>';
         $table2 = '<td style="width:5%"><i class="fas fa-location-dot"></i></td><td>'.$location_html.'</td></tr></tbody></table>';
         return $table1.$table2;
     }
 
     /******** Orientacio ****/
-    function getDivOrientacio($arg_o){
+    function getOrientacio($arg_o){
+
+        $o_11 = '<div dades="" datao="" title="E" class="control">';
+        $o_22 = '<svg dades="" xmlns="http://www.w3.org/2000/svg" width="50" height="50" version="1.1" viewBox="0 0 454.00715 454.00714" class="orientacio is-unselectable is-read-only">';
+
+        /* Valores geométricos corregidos */
+        $o_nn = '<g dades="" class=""><path dades="" d="m285.19 83.727-58.18 142.14-58.19-142.14v-0.005l58.19-83.725z"></path>
+        <text id="nn" dades="" x="227.0062" y="103.1965" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_ne = '<g  dades="" class=""><path dades="" d="m369.46 166.83-141.65 59.371 59.368-141.65 0.002-0.002 100.34-18.058z"></path>
+        <text id="ne" dades="" x="314.5495" y="139.4602" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_ee = '<g  dades="" class=""><path dades="" d="m370.28 168.82-142.14 58.18 142.14 58.185h0.005l83.722-58.185z"></path>
+        <text id="ee" dades="" x="350.8095" y="227.0021" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_se = '<g  dades="" class=""><path dades="" d="m369.46 287.17-141.65-59.371 59.368 141.65 0.002 0.002 100.34 18.058z"></path>
+        <text id="se" dades="" x="314.5495" y="314.5398" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_ss = '<g  dades="" class=""><path dades="" d="m285.19 370.28-58.18-142.14-58.185 142.14v0.005l58.185 83.722z"></path>
+        <text id="ss" dades="" x="227.0079" y="350.8095" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_sw = '<g  dades="" class=""><path dades="" d="m166.83 369.46 59.371-141.65-141.65 59.368-0.0032 0.002-18.058 100.34z"></path>
+        <text id="sw" dades="" x="139.4596" y="314.5496" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_ww = '<g  dades="" class=""><path dades="" d="m83.727 168.82 142.14 58.18-142.14 58.185h-0.0046l-83.725-58.18z"></path>
+        <text id="ww" dades="" x="103.1967" y="227.0027" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_nw = '<g dades="" class=""><path dades="" d="m166.83 84.55 59.371 141.65-141.65-59.368-0.0032-0.002l-18.058-100.34z"></path>
+        <text id="nw" dades="" x="139.4596" y="139.4604" font-size="150" text-anchor="middle" dominant-baseline="middle">.</text></g>';
+
+        $o_33 = '</svg></div>';
+
+        /* Selección */
+        switch ($arg_o) { 
+            case 'N':
+                $o_11 = '<div dades="" datao="" title="N" class="control">';	
+                $o_nn = str_replace('class=""','class="orientacio-selected"',$o_nn);
+                break;
+
+            case 'NE':
+                $o_11 = '<div dades="" datao="" title="NE" class="control">';
+                $o_ne = str_replace('class=""','class="orientacio-selected"',$o_ne);
+                break;
+
+            case 'E':
+                $o_11 = '<div dades="" datao="" title="E" class="control">';
+                $o_ee = str_replace('class=""','class="orientacio-selected"',$o_ee);
+                break;
+
+            case 'SE':
+                $o_11 = '<div dades="" datao="" title="SE" class="control">';
+                $o_se = str_replace('class=""','class="orientacio-selected"',$o_se);
+                break;
+
+            case 'S':
+                $o_11 = '<div dades="" datao="" title="S" class="control">';
+                $o_ss = str_replace('class=""','class="orientacio-selected"',$o_ss);
+                break;
+
+            case 'SW':
+                $o_11 = '<div dades="" datao="" title="SW" class="control">';
+                $o_sw = str_replace('class=""','class="orientacio-selected"',$o_sw);
+                break;
+
+            case 'W':
+                $o_11 = '<div dades="" datao="" title="W" class="control">';
+                $o_ww = str_replace('class=""','class="orientacio-selected"',$o_ww);
+                break;
+
+            case 'NW':
+                $o_11 = '<div dades="" datao="" title="NW" class="control">';
+                $o_nw = str_replace('class=""','class="orientacio-selected"',$o_nw);
+                break;		
+        } 
+
+        return $o_11.$o_22.$o_nn.$o_ne.$o_ee.$o_se.$o_ss.$o_sw.$o_ww.$o_nw.$o_33;
+    }
+    /********End Orientacio ****/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    function getDivOrientacio_OLD($arg_o){
 
     $o_11 = '<div dades="" datao="" title="E" class="control">';
     $o_22 = '<svg dades="" xmlns="http://www.w3.org/2000/svg" width="40" height="40" version="1.1" viewBox="0 0 454.00715 454.00714" class="orientacio is-unselectable is-read-only">';
